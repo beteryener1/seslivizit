@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Yoğun Bakım Vizit Asistanı v1.0</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #eef2f3; display: flex; justify-content: center; padding: 20px; }
+        .app-container { background: white; width: 100%; max-width: 800px; padding: 30px; border-radius: 15px; shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .status-bar { display: flex; justify-content: space-between; margin-bottom: 20px; color: #555; font-weight: bold; }
+        .patient-box { border: 2px solid #007bff; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        .controls { display: flex; gap: 10px; margin-top: 15px; }
+        button { flex: 1; padding: 15px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; transition: 0.3s; }
+        #recordBtn { background: #28a745; color: white; }
+        #nextBtn { background: #007bff; color: white; }
+        #finishBtn { background: #6c757d; color: white; }
+        #recordBtn.recording { background: #dc3545; animation: pulse 1.5s infinite; }
+        textarea { width: 100%; height: 150px; margin-top: 10px; border: 1px solid #ccc; border-radius: 5px; padding: 10px; font-size: 15px; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="status-bar">
+        <span>👨‍⚕️ Doktor Vizit Paneli</span>
+        <span id="counter">Hasta: 1 / 25</span>
+    </div>
+
+    <div class="patient-box">
+        <h3 id="currentTitle">Hasta #1 Notları</h3>
+        <textarea id="liveText" placeholder="Konuşmaya başlayın..."></textarea>
+        
+        <div class="controls">
+            <button id="recordBtn">🎤 Kaydı Başlat</button>
+            <button id="nextBtn">➡️ Sonraki Hasta</button>
+        </div>
+    </div>
+
+    <button id="finishBtn">📝 Viziti Tamamla ve Word İndir</button>
+</div>
+
+<script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+<script>
+    let patientCount = 1;
+    let allReports = [];
+    let isRecording = false;
+    
+    const recordBtn = document.getElementById('recordBtn');
+    const liveText = document.getElementById('liveText');
+    const counterDisplay = document.getElementById('counter');
+    
+    // Ses Tanıma Tanımlama
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'tr-TR';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onresult = (event) => {
+        let text = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            text += event.results[i][0].transcript;
+        }
+        liveText.value = text;
+    };
+
+    recordBtn.onclick = () => {
+        if (!isRecording) {
+            recognition.start();
+            recordBtn.innerText = "🛑 Kaydı Durdur";
+            recordBtn.classList.add('recording');
+        } else {
+            recognition.stop();
+            recordBtn.innerText = "🎤 Kaydı Devam Et";
+            recordBtn.classList.remove('recording');
+        }
+        isRecording = !isRecording;
+    };
+
+    document.getElementById('nextBtn').onclick = () => {
+        // Mevcut hastayı kaydet
+        allReports.push({
+            id: patientCount,
+            content: liveText.value
+        });
+        
+        // Formu temizle ve sayacı artır
+        patientCount++;
+        counterDisplay.innerText = `Hasta: ${patientCount} / 25`;
+        document.getElementById('currentTitle').innerText = `Hasta #${patientCount} Notları`;
+        liveText.value = "";
+        
+        if(isRecording) {
+            recognition.stop();
+            isRecording = false;
+            recordBtn.innerText = "🎤 Kaydı Başlat";
+            recordBtn.classList.remove('recording');
+        }
+    };
+
+    document.getElementById('finishBtn').onclick = () => {
+        // Eğer kutuda veri kaldıysa onu da ekle
+        if(liveText.value !== "") {
+            allReports.push({ id: patientCount, content: liveText.value });
+        }
+        generateComprehensiveWord();
+    };
+
+    function generateComprehensiveWord() {
+        const { Document, Paragraph, TextRun, HeadingLevel, Packer } = docx;
+        
+        const children = [
+            new Paragraph({
+                text: "GÜNLÜK VİZİT RAPORU",
+                heading: HeadingLevel.HEADING_1,
+                alignment: "center",
+            })
+        ];
+
+        allReports.forEach(report => {
+            children.push(new Paragraph({
+                text: `Hasta #${report.id}`,
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 400 }
+            }));
+            children.push(new Paragraph({
+                children: [new TextRun(report.content)]
+            }));
+        });
+
+        const doc = new Document({ sections: [{ children }] });
+
+        Packer.toBlob(doc).then((blob) => {
+            saveAs(blob, `Vizit_Raporu_${new Date().toLocaleDateString()}.docx`);
+        });
+    }
+</script>
+
+</body>
+</html>
