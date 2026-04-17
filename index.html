@@ -3,131 +3,211 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Yoğun Bakım Vizit Sistemi</title>
+    <title>YBÜ Sesli İzlem Paneli v21</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f4f9; padding: 15px; margin: 0; }
-        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-        .status-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        .patient-badge { background: #007aff; color: white; padding: 5px 12px; border-radius: 20px; font-weight: bold; font-size: 14px; }
-        textarea { width: 100%; height: 280px; border: 1px solid #ddd; border-radius: 12px; padding: 15px; font-size: 17px; line-height: 1.5; box-sizing: border-box; background: #fafafa; margin-bottom: 15px; }
-        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        button { padding: 16px; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; transition: active 0.1s; }
-        button:active { opacity: 0.7; transform: scale(0.98); }
-        #recordBtn { background: #34c759; color: white; grid-column: span 2; }
-        #recordBtn.recording { background: #ff3b30; animation: pulse 1.5s infinite; }
-        #nextBtn { background: #007aff; color: white; }
-        #finishBtn { background: #8e8e93; color: white; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.8; } 100% { opacity: 1; } }
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { margin: 0; padding: 10px; background: #f0f4f8; color: #333; font-size: 14px; }
+        .panel { background: white; border-radius: 12px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
+        h1 { font-size: 1.2rem; text-align: center; margin: 0 0 15px; color: #1e466e; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        h3 { font-size: 0.9rem; margin: 15px 0 8px; padding: 5px 10px; background: #e9ecef; border-radius: 6px; color: #495057; font-weight: bold; text-transform: uppercase; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; background: #fff; }
+        .check-group { display: flex; flex-wrap: wrap; gap: 8px; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #dee2e6; }
+        .check-group label { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; }
+        .vazo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .vazo-box { background: #fff; border: 1px solid #eee; padding: 8px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; }
+        .vazo-box input { width: 70px; height: 30px; margin-top: 5px; text-align: center; }
+        
+        /* Ses Kontrol Paneli */
+        .voice-panel { background: #1e466e; color: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; text-align: center; }
+        #voiceStatus { font-size: 12px; color: #ffc107; display: block; margin-top: 5px; }
+        .btn-voice { background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; }
+        .btn-voice.active { background: #28a745; box-shadow: 0 0 10px #28a745; }
+
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+        .btn { padding: 12px; border: none; border-radius: 25px; color: white; font-weight: bold; cursor: pointer; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="status-header">
-        <span style="font-size: 18px; font-weight: bold;">🩺 Vizit Kayıt</span>
-        <span id="counter" class="patient-badge">Hasta: 1 / 25</span>
+<div class="panel">
+    <h1>🏥 YBÜ SESLİ PANEL v21</h1>
+
+    <div class="voice-panel">
+        <button id="toggleVoice" class="btn-voice">🎤 SESLİ DOLDURMAYI BAŞLAT</button>
+        <span id="voiceStatus">Sistem Beklemede...</span>
+        <div id="livePreview" style="font-size: 11px; font-style: italic; margin-top: 8px; color: #ddd;"></div>
     </div>
 
-    <textarea id="output" placeholder="Kaydı başlatın ve konuşun..."></textarea>
+    <div class="row">
+        <input type="date" id="tarih">
+        <input type="number" id="yatakNo" placeholder="Yatak No">
+        <input type="text" id="hastaID" placeholder="Hasta ID / İsim">
+    </div>
+
+    <h3>🧠 NÖROLOJİ</h3>
+    <div class="check-group">
+        <label><input type="checkbox" value="Açık" class="b-combo"> Açık</label>
+        <label><input type="checkbox" value="Oryante" class="b-combo"> Oryante</label>
+        <label><input type="checkbox" value="Koopere" class="b-combo"> Koopere</label>
+        <label><input type="radio" name="bilinc_single" value="Konfüze" class="b-single"> Konf.</label>
+        <label><input type="radio" name="bilinc_single" value="Somnolans" class="b-single"> Somn.</label>
+        <label><input type="radio" name="bilinc_single" value="Stupor" class="b-single"> Stupor</label>
+        <label><input type="radio" name="bilinc_single" value="Koma" class="b-single"> Koma</label>
+        <input type="number" id="gks" placeholder="GKS" style="width:55px;">
+    </div>
+
+    <h3>🔬 Laboratuvar</h3>
+    <div class="row" style="grid-template-columns: 1fr 1fr 1fr;">
+        <input type="number" step="0.1" id="labHb" placeholder="Hb">
+        <input type="number" step="0.1" id="labWbc" placeholder="WBC">
+        <input type="number" step="0.1" id="labPlt" placeholder="PLT">
+        <input type="number" step="0.01" id="labKrea" placeholder="Krea">
+        <input type="number" step="0.1" id="labAlb" placeholder="Alb">
+    </div>
+
+    <h3>💉 Vazopressörler</h3>
+    <div class="vazo-grid">
+        <div class="vazo-box"><label><input type="checkbox" id="c_nor"> Norad.</label><input type="number" step="0.001" id="d_nor"></div>
+        <div class="vazo-box"><label><input type="checkbox" id="c_adr"> Adren.</label><input type="number" step="0.001" id="d_adr"></div>
+    </div>
+
+    <h3>📋 Plan & Notlar</h3>
+    <textarea id="plan" rows="3" placeholder="Plan ve Diğer Notlar..."></textarea>
 
     <div class="btn-group">
-        <button id="recordBtn">🎤 Kaydı Başlat</button>
-        <button id="nextBtn">➡️ Sıradaki Hasta</button>
-        <button id="finishBtn">📄 Viziti Kapat (Word)</button>
+        <button class="btn" style="background:#28a745" onclick="kaydet()">HASTAYI KAYDET</button>
+        <button class="btn" style="background:#6c757d" onclick="formuTemizle()">TEMİZLE</button>
+    </div>
+
+    <div id="liste"></div>
+
+    <div class="btn-group">
+        <button class="btn" style="background:#0d6efd" onclick="wordAktar()">WORD AKTAR</button>
+        <button class="btn" style="background:#dc3545" onclick="listeSil()">TEMİZLE</button>
     </div>
 </div>
 
-<script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-
 <script>
-    // --- TIBBİ SÖZLÜK AYARLARI ---
-    const medicalDictionary = {
-        "sat ": "Saturasyon: ",
-        "ta ": "Tansiyon: ",
-        "nbz ": "Nabız: ",
-        "eks oldu": "Ex oldu",
-        "entübe": "Entübe",
-        "ekstübe": "Ekstübe",
-        "batın rahat": "Batın rahat, defans-rebound yok.",
-        "asit": "Asit (Ascites)"
-    };
+    let hastaListesi = [];
+    let isListening = false;
 
-    function applyMedicalJargon(text) {
-        let corrected = text.toLowerCase();
-        for (const [key, value] of Object.entries(medicalDictionary)) {
-            corrected = corrected.replace(new RegExp(key, 'g'), value);
-        }
-        return corrected;
-    }
-
-    // --- SES TANIMA AYARLARI ---
-    let patientCount = 1;
-    let reports = [];
-    let isRecording = false;
-    let finalTranscript = "";
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
+    // --- SES TANIMA MANTIĞI ---
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = 'tr-TR';
     recognition.continuous = true;
     recognition.interimResults = true;
 
-    recognition.onresult = (event) => {
-        let interim = "";
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-            let chunk = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-                finalTranscript += applyMedicalJargon(chunk) + " ";
-            } else {
-                interim += chunk;
-            }
-        }
-        document.getElementById('output').value = finalTranscript + interim;
+    const commands = {
+        "yatak": "yatakNo",
+        "hasta": "hastaID",
+        "hemoglobin": "labHb", "hb": "labHb",
+        "lökosit": "labWbc", "wbc": "labWbc",
+        "trombosit": "labPlt", "plt": "labPlt",
+        "kreatinin": "labKrea", "krea": "labKrea",
+        "albümin": "labAlb",
+        "gks": "gks", "skor": "gks",
+        "noradrenalin": "d_nor", "norad": "d_nor",
+        "adrenalin": "d_adr",
+        "plan": "plan", "not": "plan"
     };
 
-    recognition.onend = () => { if (isRecording) recognition.start(); };
-
-    document.getElementById('recordBtn').onclick = () => {
-        if (!isRecording) {
+    document.getElementById('toggleVoice').onclick = () => {
+        if (!isListening) {
             recognition.start();
-            isRecording = true;
-            document.getElementById('recordBtn').innerText = "🛑 Kaydı Duraklat";
-            document.getElementById('recordBtn').classList.add('recording');
+            isListening = true;
+            document.getElementById('toggleVoice').innerText = "🛑 DİNLEMEYİ DURDUR";
+            document.getElementById('toggleVoice').classList.add('active');
+            document.getElementById('voiceStatus').innerText = "Sizi dinliyorum...";
         } else {
             recognition.stop();
-            isRecording = false;
-            document.getElementById('recordBtn').innerText = "🎤 Kayda Devam Et";
-            document.getElementById('recordBtn').classList.remove('recording');
+            isListening = false;
+            document.getElementById('toggleVoice').innerText = "🎤 SESLİ DOLDURMAYI BAŞLAT";
+            document.getElementById('toggleVoice').classList.remove('active');
+            document.getElementById('voiceStatus').innerText = "Sistem Beklemede.";
         }
     };
 
-    document.getElementById('nextBtn').onclick = () => {
-        reports.push({ id: patientCount, text: document.getElementById('output').value });
-        patientCount++;
-        document.getElementById('counter').innerText = `Hasta: ${patientCount} / 25`;
-        document.getElementById('output').value = "";
-        finalTranscript = "";
-    };
-
-    document.getElementById('finishBtn').onclick = () => {
-        if(document.getElementById('output').value) {
-            reports.push({ id: patientCount, text: document.getElementById('output').value });
+    recognition.onresult = (event) => {
+        let transcript = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            transcript = event.results[i][0].transcript.toLowerCase();
         }
-        
-        const { Document, Paragraph, TextRun, HeadingLevel, Packer } = docx;
-        const sections = reports.map(r => [
-            new Paragraph({ text: `Hasta #${r.id}`, heading: HeadingLevel.HEADING_2, spacing: {before: 400} }),
-            new Paragraph({ children: [new TextRun(r.text)] })
-        ]).flat();
+        document.getElementById('livePreview').innerText = "Duyulan: " + transcript;
 
-        const doc = new Document({ sections: [{ children: [
-            new Paragraph({ text: "GÜNLÜK VİZİT RAPORU", heading: HeadingLevel.HEADING_1, alignment: "center" }),
-            ...sections
-        ]}] });
+        // Sayısal Verileri Eşleştir
+        Object.keys(commands).forEach(cmd => {
+            if (transcript.includes(cmd)) {
+                let regex = new RegExp(`${cmd}\\s*(\\d+[.,]?\\d*)`, 'i');
+                let match = transcript.match(regex);
+                if (match && match[1]) {
+                    let val = match[1].replace(',', '.');
+                    let target = document.getElementById(commands[cmd]);
+                    target.value = val;
+                    // Vazo ise otomatik checkle
+                    if(commands[cmd].startsWith('d_')) {
+                        document.getElementById('c_' + commands[cmd].split('_')[1]).checked = true;
+                    }
+                }
+            }
+        });
 
-        Packer.toBlob(doc).then(blob => { saveAs(blob, "Vizit_Raporu.docx"); });
+        // Durumsal Veriler (Bilinç vb)
+        if(transcript.includes("açık")) document.querySelector('input[value="Açık"]').checked = true;
+        if(transcript.includes("oryante")) document.querySelector('input[value="Oryante"]').checked = true;
+        if(transcript.includes("koopere")) document.querySelector('input[value="Koopere"]').checked = true;
+        if(transcript.includes("koma")) document.querySelector('input[value="Koma"]').checked = true;
     };
+
+    recognition.onend = () => { if(isListening) recognition.start(); };
+
+    // --- MEVCUT KAYIT FONKSİYONLARI (Kısaltılmış) ---
+    function kaydet() {
+        let v = {
+            tarih: document.getElementById('tarih').value,
+            yatak: document.getElementById('yatakNo').value,
+            id: document.getElementById('hastaID').value,
+            plan: document.getElementById('plan').value,
+            vazo: { nor: document.getElementById('d_nor').value }
+            // Diğer alanları ihtiyaca göre buraya ekleyebilirsiniz
+        };
+        hastaListesi.push(v);
+        listeGuncelle();
+        formuTemizle();
+    }
+
+    function listeGuncelle() {
+        let l = document.getElementById('liste'); l.innerHTML = '';
+        hastaListesi.forEach((h, i) => {
+            l.innerHTML += `<div style="background:#fff; padding:8px; margin-top:5px; border-radius:5px; display:flex; justify-content:space-between; border:1px solid #ddd;">
+                <span>Yatak ${h.yatak} - ${h.id}</span>
+                <button onclick="sil(${i})" style="color:red; border:none; background:none; cursor:pointer;">SİL</button>
+            </div>`;
+        });
+    }
+
+    function formuTemizle() {
+        document.querySelectorAll('input[type=number], input[type=text], textarea').forEach(i => i.value='');
+        document.querySelectorAll('input[type=checkbox], input[type=radio]').forEach(r => r.checked=false);
+    }
+
+    function wordAktar() {
+        let content = "GÜNLÜK VİZİT NOTLARI\n\n";
+        hastaListesi.forEach(h => {
+            content += `Yatak: ${h.yatak} | Hasta: ${h.id}\nPlan: ${h.plan}\n-------------------\n`;
+        });
+        let blob = new Blob([content], {type: 'application/msword'});
+        let link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.download = "vizit.doc";
+        link.click();
+    }
+
+    function sil(i) { hastaListesi.splice(i,1); listeGuncelle(); }
+    function listeSil() { hastaListesi = []; listeGuncelle(); }
+
+    window.onload = () => { document.getElementById('tarih').value = new Date().toISOString().split('T')[0]; };
 </script>
 </body>
 </html>
