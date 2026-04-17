@@ -2,41 +2,39 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Yoğun Bakım Vizit Asistanı v1.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yoğun Bakım Vizit Asistanı</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #eef2f3; display: flex; justify-content: center; padding: 20px; }
-        .app-container { background: white; width: 100%; max-width: 800px; padding: 30px; border-radius: 15px; shadow: 0 10px 25px rgba(0,0,0,0.1); }
-        .status-bar { display: flex; justify-content: space-between; margin-bottom: 20px; color: #555; font-weight: bold; }
-        .patient-box { border: 2px solid #007bff; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-        .controls { display: flex; gap: 10px; margin-top: 15px; }
-        button { flex: 1; padding: 15px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; transition: 0.3s; }
-        #recordBtn { background: #28a745; color: white; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 20px; color: #333; }
+        .app-container { max-width: 700px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .header { text-align: center; border-bottom: 2px solid #eee; margin-bottom: 20px; padding-bottom: 10px; }
+        .patient-info { background: #e7f3ff; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; color: #007bff; }
+        textarea { width: 100%; height: 250px; border: 1px solid #ccc; border-radius: 10px; padding: 15px; font-size: 16px; box-sizing: border-box; resize: none; background: #fafafa; }
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+        button { padding: 15px; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        #recordBtn { background: #28a745; color: white; grid-column: span 2; }
+        #recordBtn.recording { background: #dc3545; animation: blink 1.5s infinite; }
         #nextBtn { background: #007bff; color: white; }
         #finishBtn { background: #6c757d; color: white; }
-        #recordBtn.recording { background: #dc3545; animation: pulse 1.5s infinite; }
-        textarea { width: 100%; height: 150px; margin-top: 10px; border: 1px solid #ccc; border-radius: 5px; padding: 10px; font-size: 15px; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
 <div class="app-container">
-    <div class="status-bar">
-        <span>👨‍⚕️ Doktor Vizit Paneli</span>
-        <span id="counter">Hasta: 1 / 25</span>
+    <div class="header">
+        <h2>🩺 Yoğun Bakım Vizit Notları</h2>
     </div>
 
-    <div class="patient-box">
-        <h3 id="currentTitle">Hasta #1 Notları</h3>
-        <textarea id="liveText" placeholder="Konuşmaya başlayın..."></textarea>
-        
-        <div class="controls">
-            <button id="recordBtn">🎤 Kaydı Başlat</button>
-            <button id="nextBtn">➡️ Sonraki Hasta</button>
-        </div>
-    </div>
+    <div class="patient-info" id="counter">Mevcut Hasta: 1 / 25</div>
+    
+    <textarea id="output" placeholder="Doktor bey/hanım, konuşmaya başlayabilirsiniz..."></textarea>
 
-    <button id="finishBtn">📝 Viziti Tamamla ve Word İndir</button>
+    <div class="controls">
+        <button id="recordBtn">🎤 Kaydı Başlat</button>
+        <button id="nextBtn">➡️ Sıradaki Hasta</button>
+        <button id="finishBtn">💾 Viziti Bitir (Word)</button>
+    </div>
 </div>
 
 <script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
@@ -46,93 +44,91 @@
     let patientCount = 1;
     let allReports = [];
     let isRecording = false;
-    
+    let finalTranscript = ""; // Duraksamalarda silinmemesi için ana depo
+
     const recordBtn = document.getElementById('recordBtn');
-    const liveText = document.getElementById('liveText');
+    const output = document.getElementById('output');
     const counterDisplay = document.getElementById('counter');
-    
-    // Ses Tanıma Tanımlama
-    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+
+    // Ses Tanıma Kurulumu
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+
     recognition.lang = 'tr-TR';
-    recognition.continuous = true;
-    recognition.interimResults = true;
+    recognition.continuous = true; // Kesintisiz dinleme
+    recognition.interimResults = true; // Konuşurken ekrana yazma
 
     recognition.onresult = (event) => {
-        let text = '';
+        let interimTranscript = "";
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-            text += event.results[i][0].transcript;
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                finalTranscript += transcript + " ";
+            } else {
+                interimTranscript += transcript;
+            }
         }
-        liveText.value = text;
+        // Ekrana hem kesinleşmiş hem de o anki tahmini yazdırıyoruz
+        output.value = finalTranscript + interimTranscript;
+    };
+
+    recognition.onend = () => {
+        // Eğer kullanıcı durdurmadıysa ama tarayıcı kestiysye geri başlat
+        if (isRecording) {
+            recognition.start();
+        }
     };
 
     recordBtn.onclick = () => {
         if (!isRecording) {
             recognition.start();
-            recordBtn.innerText = "🛑 Kaydı Durdur";
+            isRecording = true;
+            recordBtn.innerText = "🛑 Kaydı Duraklat";
             recordBtn.classList.add('recording');
         } else {
             recognition.stop();
-            recordBtn.innerText = "🎤 Kaydı Devam Et";
+            isRecording = false;
+            recordBtn.innerText = "🎤 Kayda Devam Et";
             recordBtn.classList.remove('recording');
         }
-        isRecording = !isRecording;
     };
 
     document.getElementById('nextBtn').onclick = () => {
-        // Mevcut hastayı kaydet
+        // Mevcut veriyi kaydet
         allReports.push({
             id: patientCount,
-            content: liveText.value
+            content: output.value
         });
-        
-        // Formu temizle ve sayacı artır
+
+        // Ekranı ve değişkeni sıfırla
         patientCount++;
-        counterDisplay.innerText = `Hasta: ${patientCount} / 25`;
-        document.getElementById('currentTitle').innerText = `Hasta #${patientCount} Notları`;
-        liveText.value = "";
-        
-        if(isRecording) {
-            recognition.stop();
-            isRecording = false;
-            recordBtn.innerText = "🎤 Kaydı Başlat";
-            recordBtn.classList.remove('recording');
-        }
+        counterDisplay.innerText = `Mevcut Hasta: ${patientCount} / 25`;
+        finalTranscript = ""; 
+        output.value = "";
     };
 
     document.getElementById('finishBtn').onclick = () => {
-        // Eğer kutuda veri kaldıysa onu da ekle
-        if(liveText.value !== "") {
-            allReports.push({ id: patientCount, content: liveText.value });
+        // Son hastayı ekle (eğeri kutu boş değilse)
+        if(output.value !== "") {
+            allReports.push({ id: patientCount, content: output.value });
         }
-        generateComprehensiveWord();
+        saveToWord();
     };
 
-    function generateComprehensiveWord() {
+    function saveToWord() {
         const { Document, Paragraph, TextRun, HeadingLevel, Packer } = docx;
-        
         const children = [
-            new Paragraph({
-                text: "GÜNLÜK VİZİT RAPORU",
-                heading: HeadingLevel.HEADING_1,
-                alignment: "center",
-            })
+            new Paragraph({ text: "GÜNLÜK VİZİT RAPORU", heading: HeadingLevel.HEADING_1, alignment: "center" })
         ];
 
-        allReports.forEach(report => {
-            children.push(new Paragraph({
-                text: `Hasta #${report.id}`,
-                heading: HeadingLevel.HEADING_2,
-                spacing: { before: 400 }
-            }));
-            children.push(new Paragraph({
-                children: [new TextRun(report.content)]
-            }));
+        allReports.forEach(r => {
+            children.push(new Paragraph({ text: `Hasta #${r.id}`, heading: HeadingLevel.HEADING_2, spacing: { before: 400 } }));
+            children.push(new Paragraph({ children: [new TextRun(r.content)] }));
         });
 
         const doc = new Document({ sections: [{ children }] });
-
-        Packer.toBlob(doc).then((blob) => {
-            saveAs(blob, `Vizit_Raporu_${new Date().toLocaleDateString()}.docx`);
+        Packer.toBlob(doc).then(blob => {
+            saveAs(blob, `Vizit_${new Date().toLocaleDateString()}.docx`);
         });
     }
 </script>
